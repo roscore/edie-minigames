@@ -35,6 +35,13 @@ async fn main() {
         let dt = get_frame_time().min(0.1);
         let elapsed = get_time() as f32;
 
+        // ESC returns to menu from any in-game phase.
+        if is_key_pressed(KeyCode::Escape)
+            && !matches!(game.phase, Phase::Menu | Phase::GameOver)
+        {
+            game.phase = Phase::Menu;
+        }
+
         match game.phase {
             Phase::Menu => {
                 if is_key_pressed(KeyCode::Key1) { game.start_game(2); }

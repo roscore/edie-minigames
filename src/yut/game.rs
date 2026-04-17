@@ -57,10 +57,12 @@ impl Player {
         self.pieces.iter().all(|p| p.is_exited())
     }
 
-    /// Pieces that can be moved (on board or at home).
+    /// Pieces that can be moved (on board or at home). Pieces with
+    /// `stack == 0` are "riders" already merged onto a primary piece —
+    /// they move with the primary, not independently.
     pub fn movable_pieces(&self) -> Vec<usize> {
         self.pieces.iter().enumerate()
-            .filter(|(_, p)| !p.is_exited())
+            .filter(|(_, p)| !p.is_exited() && p.stack > 0)
             .map(|(i, _)| i)
             .collect()
     }
@@ -314,7 +316,8 @@ impl YutGame {
         if self.phase != Phase::SelectPiece { return; }
         let player = &self.players[self.current_player];
         if piece_idx >= PIECES_PER_PLAYER { return; }
-        if player.pieces[piece_idx].is_exited() { return; }
+        let piece = &player.pieces[piece_idx];
+        if piece.is_exited() || piece.stack == 0 { return; }
         self.selected_piece = Some(piece_idx);
         self.try_move_selected();
     }
@@ -593,5 +596,35 @@ mod tests {
         let g = new_game(4);
         assert_eq!(g.players.len(), 4);
         assert_eq!(g.num_players, 4);
+    }
+
+    #[test]
+    fn riders_are_not_movable() {
+        // Rider pieces (stack == 0) should not appear in movable_pieces —
+        // they ride with the primary piece at the same position.
+        let mut g = new_game(2);
+        g.players[0].pieces[0].pos = 5;
+        g.players[0].pieces[0].stack = 2;
+        g.players[0].pieces[1].pos = 5;
+        g.players[0].pieces[1].stack = 0; // rider merged onto pieces[0]
+        let movable = g.players[0].movable_pieces();
+        assert!(!movable.contains(&1), "rider piece should not be movable");
+        assert!(movable.contains(&0), "primary piece should remain movable");
+    }
+
+    #[test]
+    fn select_piece_ignores_rider() {
+        // Selecting a rider must not crash or mutate selection.
+        let mut g = new_game(2);
+        g.players[0].pieces[0].pos = 5;
+        g.players[0].pieces[0].stack = 2;
+        g.players[0].pieces[1].pos = 5;
+        g.players[0].pieces[1].stack = 0;
+        g.last_throw = Some(YutResult::Gae);
+        g.phase = Phase::SelectPiece;
+        g.select_piece(1); // rider
+        // Phase should stay SelectPiece (no move executed)
+        assert_eq!(g.phase, Phase::SelectPiece);
+        assert!(g.selected_piece.is_none());
     }
 }
