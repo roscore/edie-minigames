@@ -7,8 +7,8 @@ use edie_runner::platform::storage::BrowserStorage;
 use edie_runner::platform::visibility::VisibilityTracker;
 use edie_runner::render::camera::Camera;
 use edie_runner::render::sprites::{
-    boss_touch_buttons, draw_aurora, draw_boss_intro, draw_boss_mode, draw_countdown,
-    draw_effects, draw_heart_pickup, draw_hit_flash, draw_obstacle, draw_player,
+    boss_touch_buttons, draw_aurora, draw_boss_intro, draw_boss_mode, draw_clawd_flybys,
+    draw_countdown, draw_effects, draw_heart_pickup, draw_hit_flash, draw_obstacle, draw_player,
     draw_stage_wipe, draw_tier_banner, draw_touch_buttons, draw_vignette,
     logical_rect_to_screen, play_touch_buttons,
 };
@@ -244,6 +244,10 @@ async fn main() {
             game.world.landmark.as_ref(),
             &cam,
         );
+        // clawd aerial cameos (AeiROBOT stage onward) — drawn above the
+        // background so they read clearly against the sky, but before
+        // obstacles so the player never mistakes one for a hazard.
+        draw_clawd_flybys(&game.world.clawd_flyby, &cam);
 
         // Auto-cue: countdown beeps + stage-wipe whoosh. We do this in
         // main.rs (not the simulation layer) because they are pure audio

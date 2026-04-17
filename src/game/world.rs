@@ -78,6 +78,21 @@ pub struct World {
     /// Set once the Hanyang gate has been spawned this run so we don't
     /// re-spawn it if the player re-enters the Ansan stage somehow.
     hanyang_gate_spawned: bool,
+    /// clawd aerial cameos — cosmetic, non-interactive streaks across
+    /// the sky. Only spawned at AeiROBOT stage and beyond.
+    pub clawd_flyby: Vec<ClawdFlyby>,
+    clawd_spawn_timer: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ClawdFlyby {
+    /// Logical screen-space x (scrolls left to right across the sky).
+    pub x: f32,
+    pub y: f32,
+    /// Horizontal speed in px/s.
+    pub vx: f32,
+    /// Lifetime counter for sparkle wobble.
+    pub age: f32,
 }
 
 impl World {
@@ -100,6 +115,8 @@ impl World {
             last_stage: Stage::DepartmentStore,
             landmark: None,
             hanyang_gate_spawned: false,
+            clawd_flyby: Vec::new(),
+            clawd_spawn_timer: 0.0,
         }
     }
 
@@ -179,6 +196,7 @@ impl World {
 
         let speed = self.current_speed();
         self.background.update(sim_dt, speed);
+        self.update_clawd_flyby(sim_dt);
 
         // Stage transitions: the visual wipe is short and unobtrusive, so
         // we only suppress new obstacle spawns during the early "slide-in"
@@ -348,6 +366,33 @@ impl World {
         }
 
         RunOutcome::Continuing
+    }
+
+    /// Cosmetic clawd aerial cameo: a small sparkling streak crosses
+    /// the sky once per ~8-30s, starting at the AeiROBOT Office stage
+    /// (tier 7 / score 17500). Purely visual; never collides.
+    fn update_clawd_flyby(&mut self, dt: f32) {
+        use rand::Rng as _;
+        // Advance existing flybys.
+        for f in &mut self.clawd_flyby {
+            f.x += f.vx * dt;
+            f.age += dt;
+        }
+        self.clawd_flyby.retain(|f| f.x < 1400.0);
+
+        // Gate on AeiROBOT stage or later.
+        let tier = tier_for_score(self.score.current);
+        if tier < 7 { return; }
+
+        self.clawd_spawn_timer -= dt;
+        if self.clawd_spawn_timer > 0.0 { return; }
+        // Random 8-30s between appearances.
+        self.clawd_spawn_timer = self.rng.gen_range(8.0..30.0);
+
+        // Sky lane: top 35% of the 720-tall logical frame.
+        let y = self.rng.gen_range(40.0..230.0);
+        let vx = self.rng.gen_range(520.0..720.0);
+        self.clawd_flyby.push(ClawdFlyby { x: -120.0, y, vx, age: 0.0 });
     }
 }
 
