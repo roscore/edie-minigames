@@ -2154,3 +2154,51 @@ pub fn draw_vignette(speed: f32, cam: &Camera) {
         Color::new(0.0, 0.0, 0.0, intensity * 0.5),
     );
 }
+
+/// Render the clawd aerial cameos: a short trail of orange + gold motion
+/// streaks ending in a small glyph. Purely cosmetic.
+pub fn draw_clawd_flybys(flybys: &[crate::game::world::ClawdFlyby], cam: &Camera) {
+    for f in flybys {
+        let trail_len = 110.0;
+        let trail_start_x = f.x - trail_len;
+        for i in 0..8 {
+            let t = i as f32 / 7.0;
+            let sx = trail_start_x + trail_len * t;
+            let wobble = ((f.age * 12.0) + t * 6.0).sin() * 3.0;
+            let sy = f.y + wobble * (1.0 - t);
+            let (px, py) = cam.to_screen(sx, sy);
+            let alpha = (1.0 - t).powf(1.6) * 0.85;
+            let col = Color::new(0.95, 0.55 + 0.25 * t, 0.15 + 0.30 * t, alpha);
+            draw_circle(px, py, cam.scaled(5.0 * (1.0 - t * 0.4)), col);
+        }
+        // Head glyph: gold diamond with a bright core
+        let (hx, hy) = cam.to_screen(f.x, f.y);
+        let r = cam.scaled(7.0);
+        let edge = Color::new(0.22, 0.12, 0.04, 0.95);
+        let fill = Color::new(1.0, 0.88, 0.35, 0.95);
+        draw_triangle(
+            macroquad::math::Vec2::new(hx, hy - r),
+            macroquad::math::Vec2::new(hx + r, hy),
+            macroquad::math::Vec2::new(hx, hy + r),
+            fill,
+        );
+        draw_triangle(
+            macroquad::math::Vec2::new(hx, hy - r),
+            macroquad::math::Vec2::new(hx - r, hy),
+            macroquad::math::Vec2::new(hx, hy + r),
+            fill,
+        );
+        draw_line(hx - r, hy, hx + r, hy, 1.5, edge);
+        draw_line(hx, hy - r, hx, hy + r, 1.5, edge);
+        draw_circle(hx, hy, cam.scaled(2.0), Color::new(1.0, 1.0, 0.95, 1.0));
+        // Four sparkles at the head
+        for j in 0..4 {
+            let phase = f.age * 3.0 + j as f32 * std::f32::consts::FRAC_PI_2;
+            let sx = hx + phase.cos() * cam.scaled(12.0);
+            let sy = hy + phase.sin() * cam.scaled(12.0);
+            let arm = cam.scaled(3.0);
+            draw_line(sx - arm, sy, sx + arm, sy, 1.2, Color::new(1.0, 0.94, 0.55, 0.8));
+            draw_line(sx, sy - arm, sx, sy + arm, 1.2, Color::new(1.0, 0.94, 0.55, 0.8));
+        }
+    }
+}
