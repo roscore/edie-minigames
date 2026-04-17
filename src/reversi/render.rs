@@ -20,8 +20,8 @@ const CELL_B: Color = Color::new(0.94, 0.88, 0.78, 1.0);
 const GRID_LINE: Color = Color::new(0.24, 0.58, 0.45, 0.35);
 
 /// Theme names for the easter egg.
-pub const THEME_NAMES: [&str; 5] = ["EDIE", "AMY", "ALICE M1", "ALICE 3", "ALICE 4"];
-pub const THEME_COUNT: usize = 5;
+pub const THEME_NAMES: [&str; 6] = ["EDIE", "AMY", "ALICE M1", "ALICE 3", "ALICE 4", "TEIO"];
+pub const THEME_COUNT: usize = 6;
 
 /// Player-side theme color based on theme_index.
 fn theme_color(index: usize) -> Color {
@@ -31,11 +31,13 @@ fn theme_color(index: usize) -> Color {
         2 => Color::new(0.95, 0.55, 0.70, 1.0),         // AliceM1 — pink
         3 => Color::new(0.90, 0.30, 0.35, 1.0),         // Alice3 — red
         4 => Color::new(0.31, 0.76, 0.97, 1.0),         // Alice4 — cyan
+        5 => Color::new(1.00, 0.85, 0.30, 1.0),         // TEIO — gold
         _ => ORANGE,
     }
 }
 
-/// Player-side texture based on theme_index.
+/// Player-side texture based on theme_index. TEIO reuses EDIE's sprite
+/// with a gold wash applied at the draw site.
 fn theme_texture<'a>(index: usize, assets: &'a AssetHandles) -> &'a Texture2D {
     match index {
         0 => &assets.edie_static_run,
@@ -43,8 +45,14 @@ fn theme_texture<'a>(index: usize, assets: &'a AssetHandles) -> &'a Texture2D {
         2 => &assets.obstacle_alicem1,
         3 => &assets.obstacle_alice3,
         4 => &assets.obstacle_alice4,
+        5 => &assets.edie_static_run,
         _ => &assets.edie_static_run,
     }
+}
+
+/// TEIO draws the EDIE sprite with a gold wash. Other themes untinted.
+fn theme_tint(index: usize) -> Color {
+    if index == 5 { Color::new(1.0, 0.88, 0.55, 1.0) } else { WHITE }
 }
 
 /// Title text for easter egg menu title hit-testing (generous area).
@@ -55,7 +63,7 @@ pub fn draw_reversi(game: &ReversiGame, assets: &AssetHandles, elapsed: f32) {
     clear_background(Color::new(0.96, 0.94, 0.88, 1.0));
     draw_background(elapsed, &cam);
     match game.phase {
-        Phase::Menu => draw_menu(game.theme_index, &cam),
+        Phase::Menu => draw_menu(game, &cam),
         Phase::Playing | Phase::Animating | Phase::UsingPowerup => {
             draw_board_frame(&cam);
             draw_cells(&cam);
@@ -137,6 +145,9 @@ fn opponent_texture<'a>(assets: &'a AssetHandles, mode: GameMode) -> &'a Texture
         GameMode::VsAiHard => &assets.obstacle_alicem1,
         GameMode::VsAiInsane => &assets.obstacle_alice4,
         GameMode::VsLocal => &assets.obstacle_alice3,
+        // clawd reuses the virus art as a visual base — it gets a
+        // distinctive drawn overlay in `draw_clawd_marker`.
+        GameMode::VsClawd => &assets.boss_virus,
     }
 }
 
@@ -147,20 +158,50 @@ fn opponent_name(mode: GameMode) -> &'static str {
         GameMode::VsAiHard => "ALICE M1",
         GameMode::VsAiInsane => "ALICE 4",
         GameMode::VsLocal => "PLAYER 2",
+        GameMode::VsClawd => "clawd",
     }
+}
+
+fn opponent_is_clawd(mode: GameMode) -> bool {
+    matches!(mode, GameMode::VsClawd)
+}
+
+/// Draw a distinctive clawd marker (tufted cape of orange + gold) over
+/// a given rect. Used wherever the opponent portrait is rendered.
+fn draw_clawd_overlay(cx: f32, cy: f32, half_size: f32, elapsed: f32, cam: &Camera) {
+    let pulse = 0.55 + 0.25 * (elapsed * 2.4).sin();
+    let r = cam.scaled(half_size);
+    // Orange aura ring
+    draw_circle_lines(cx, cy, r * 1.18, 3.0, Color::new(0.95, 0.55, 0.15, pulse));
+    // Gold star glyphs at 5 points around the figure
+    let arm = cam.scaled(5.0);
+    for i in 0..5 {
+        let phase = elapsed * 1.4 + i as f32 * (std::f32::consts::TAU / 5.0);
+        let sx = cx + phase.cos() * r * 1.05;
+        let sy = cy + phase.sin() * r * 1.05;
+        draw_line(sx - arm, sy, sx + arm, sy, 1.5, Color::new(1.0, 0.92, 0.45, 0.95));
+        draw_line(sx, sy - arm, sx, sy + arm, 1.5, Color::new(1.0, 0.92, 0.45, 0.95));
+    }
+    // Small "AI" caption underneath
+    let label = "clawd";
+    let ls = 12.0 * cam.scale;
+    let ld = measure_text(label, None, ls as u16, 1.0);
+    draw_text(label, cx - ld.width * 0.5, cy + r * 1.32, ls, Color::new(0.22, 0.12, 0.04, 0.95));
 }
 
 fn draw_pieces(board: &Board, assets: &AssetHandles, elapsed: f32, mode: GameMode, theme_idx: usize, cam: &Camera) {
     let max_size = CELL_PX - 8.0;
     let opp_tex = opponent_texture(assets, mode);
     let player_tex = theme_texture(theme_idx, assets);
+    let player_tint = theme_tint(theme_idx);
+    let clawd = opponent_is_clawd(mode);
     for r in 0..BOARD_SIZE {
         for c in 0..BOARD_SIZE {
             if let Cell::Piece(side) = board.cells[r][c] {
                 let bob = ((elapsed * 2.0 + (r * 3 + c) as f32 * 0.5).sin() * 2.0).round();
-                let tex = match side {
-                    Side::Edie => player_tex,
-                    Side::Alice => opp_tex,
+                let (tex, tint) = match side {
+                    Side::Edie => (player_tex, player_tint),
+                    Side::Alice => (opp_tex, WHITE),
                 };
                 let src_w = tex.width();
                 let src_h = tex.height();
@@ -170,13 +211,32 @@ fn draw_pieces(board: &Board, assets: &AssetHandles, elapsed: f32, mode: GameMod
                 let lx = BOARD_X + c as f32 * CELL_PX + (CELL_PX - pw) * 0.5;
                 let ly = BOARD_Y + r as f32 * CELL_PX + (CELL_PX - ph) * 0.5;
                 let (sx, sy) = cam.to_screen(lx, ly + bob);
-                draw_texture_ex(tex, sx, sy, WHITE, DrawTextureParams {
+                draw_texture_ex(tex, sx, sy, tint, DrawTextureParams {
                     dest_size: Some(vec2(cam.scaled(pw), cam.scaled(ph))),
                     ..Default::default()
                 });
+                // Light overlays so TEIO / clawd are recognisable on-board.
+                if side == Side::Edie && theme_idx == 5 {
+                    let cx = sx + cam.scaled(pw) * 0.5;
+                    let cy = sy + cam.scaled(ph) * 0.5;
+                    draw_tiny_star(cx, cy + cam.scaled(pw) * 0.35, cam.scaled(3.0), elapsed, 0.0);
+                }
+                if side == Side::Alice && clawd {
+                    let cx = sx + cam.scaled(pw) * 0.5;
+                    let cy = sy + cam.scaled(ph) * 0.5;
+                    draw_tiny_star(cx + cam.scaled(pw) * 0.3, cy - cam.scaled(ph) * 0.4, cam.scaled(3.0), elapsed, 1.2);
+                }
             }
         }
     }
+}
+
+/// Small gold sparkle glyph — used for TEIO + clawd on-board markers.
+fn draw_tiny_star(cx: f32, cy: f32, arm: f32, elapsed: f32, phase: f32) {
+    let pulse = 0.55 + 0.35 * (elapsed * 5.0 + phase).sin();
+    let col = Color::new(1.0, 0.88, 0.35, pulse);
+    draw_line(cx - arm, cy, cx + arm, cy, 1.5, col);
+    draw_line(cx, cy - arm, cx, cy + arm, 1.5, col);
 }
 
 fn draw_viruses(board: &Board, assets: &AssetHandles, elapsed: f32, cam: &Camera) {
@@ -251,7 +311,7 @@ fn draw_hud(board: &Board, assets: &AssetHandles, elapsed: f32, theme_idx: usize
     let psrc_w = player_tex.width();
     let psrc_h = player_tex.height();
     let pfit = (56.0 / psrc_w).min(56.0 / psrc_h);
-    draw_texture_ex(player_tex, ex, ey, WHITE, DrawTextureParams {
+    draw_texture_ex(player_tex, ex, ey, theme_tint(theme_idx), DrawTextureParams {
         dest_size: Some(vec2(cam.scaled(psrc_w * pfit), cam.scaled(psrc_h * pfit))),
         ..Default::default()
     });
@@ -267,6 +327,11 @@ fn draw_hud(board: &Board, assets: &AssetHandles, elapsed: f32, theme_idx: usize
         dest_size: Some(vec2(cam.scaled(osrc_w * ofit), cam.scaled(osrc_h * ofit))),
         ..Default::default()
     });
+    if opponent_is_clawd(mode) {
+        let cx = ax + cam.scaled(osrc_w * ofit) * 0.5;
+        let cy = ay + cam.scaled(osrc_h * ofit) * 0.5;
+        draw_clawd_overlay(cx, cy, 30.0, elapsed, cam);
+    }
 
     // HP bars (shifted right to leave room for character icons)
     draw_hp_bar(78.0, 658.0, board.edie_hp, THEME_NAMES[theme_idx], true, cam);
@@ -333,7 +398,15 @@ fn draw_turn_indicator(board: &Board, elapsed: f32, cam: &Camera) {
     draw_text(label, tx - dim.width * 0.5, ty, size, col);
 }
 
-fn draw_menu(theme_idx: usize, cam: &Camera) {
+fn draw_menu(game: &ReversiGame, cam: &Camera) {
+    let theme_idx = game.theme_index;
+    // AeiROBOT brand line above the title.
+    let brand = "AeiROBOT × EDIE";
+    let bs = 18.0 * cam.scale;
+    let bd = measure_text(brand, None, bs as u16, 1.0);
+    let (bx, by) = cam.to_screen(640.0, 132.0);
+    draw_text(brand, bx - bd.width * 0.5, by, bs, Color::new(0.45, 0.28, 0.08, 0.85));
+
     let title = "EDIE BATTLE REVERSE";
     let size = 48.0 * cam.scale;
     let dim = measure_text(title, None, size as u16, 1.0);
@@ -432,10 +505,19 @@ fn draw_game_over(game: &ReversiGame, assets: &AssetHandles, elapsed: f32, cam: 
     let ww = 120.0;
     let wh = (winner_tex.height() / winner_tex.width().max(1.0)) * ww;
     let (wx, wy) = cam.to_screen(400.0, 290.0 - bounce);
-    draw_texture_ex(winner_tex, wx, wy, WHITE, DrawTextureParams {
+    let winner_tint = match board.winner() {
+        Some(Side::Edie) => theme_tint(game.theme_index),
+        _ => WHITE,
+    };
+    draw_texture_ex(winner_tex, wx, wy, winner_tint, DrawTextureParams {
         dest_size: Some(vec2(cam.scaled(ww), cam.scaled(wh.min(140.0)))),
         ..Default::default()
     });
+    if board.winner() == Some(Side::Alice) && opponent_is_clawd(game.mode) {
+        let cx = wx + cam.scaled(ww) * 0.5;
+        let cy = wy + cam.scaled(wh.min(140.0)) * 0.5;
+        draw_clawd_overlay(cx, cy, 64.0, elapsed, cam);
+    }
 
     // Loser: small, tilted, desaturated
     let lw = 60.0;
