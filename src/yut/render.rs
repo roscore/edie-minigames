@@ -47,6 +47,18 @@ fn player_name(idx: usize) -> &'static str {
     }
 }
 
+/// Player name accounting for the TEIO easter-egg swap on slot 0.
+fn effective_player_name(idx: usize, teio: bool) -> &'static str {
+    if teio && idx == 0 { "TEIO" } else { player_name(idx) }
+}
+
+fn teio_gold() -> Color { Color::new(1.00, 0.85, 0.30, 1.0) }
+
+/// Player color accounting for TEIO swap.
+fn effective_player_color(idx: usize, teio: bool) -> Color {
+    if teio && idx == 0 { teio_gold() } else { player_color(idx) }
+}
+
 /// Anchor for each player's home zone in logical coords (top-left of the
 /// 4×2 piece grid).
 fn home_anchor(pi: usize) -> (f32, f32) {
@@ -125,7 +137,7 @@ pub fn draw_yut(game: &YutGame, assets: &AssetHandles, elapsed: f32) {
     draw_daylight_backdrop(elapsed, &cam);
 
     match game.phase {
-        Phase::Menu => draw_menu(assets, elapsed, &cam),
+        Phase::Menu => draw_menu(game, assets, elapsed, &cam),
         Phase::GameOver => {
             draw_board(&cam);
             draw_home_zones(game, assets, elapsed, &cam);
@@ -224,9 +236,9 @@ fn draw_board(cam: &Camera) {
     }
 }
 
-fn draw_piece_sprite(assets: &AssetHandles, pi: usize, sx: f32, sy: f32, logical_size: f32, cam: &Camera, stack: u8, shield: u8) {
+fn draw_piece_sprite(assets: &AssetHandles, pi: usize, sx: f32, sy: f32, logical_size: f32, cam: &Camera, stack: u8, shield: u8, teio: bool, elapsed: f32) {
     let tex = player_texture(pi, assets);
-    let color = player_color(pi);
+    let color = effective_player_color(pi, teio);
     // Colored halo behind the sprite so each player stays distinguishable
     // even with shared-style character art.
     let halo = cam.scaled(logical_size * 0.72);
@@ -238,10 +250,17 @@ fn draw_piece_sprite(assets: &AssetHandles, pi: usize, sx: f32, sy: f32, logical
     let pw = src_w * fit;
     let ph = src_h * fit;
     let (dx, dy) = (sx - cam.scaled(pw) * 0.5, sy - cam.scaled(ph) * 0.5);
-    draw_texture_ex(tex, dx, dy, WHITE, DrawTextureParams {
+    // TEIO slot 0 gets a gold wash on the sprite; others render as-is.
+    let sprite_tint = if teio && pi == 0 {
+        Color::new(1.0, 0.88, 0.55, 1.0)
+    } else { WHITE };
+    draw_texture_ex(tex, dx, dy, sprite_tint, DrawTextureParams {
         dest_size: Some(vec2(cam.scaled(pw), cam.scaled(ph))),
         ..Default::default()
     });
+    if teio && pi == 0 {
+        draw_teio_sparkles(sx, sy, halo, elapsed, cam);
+    }
     if stack > 1 {
         let txt = format!("x{}", stack);
         let ts = 13.0 * cam.scale;
@@ -259,6 +278,20 @@ fn draw_piece_sprite(assets: &AssetHandles, pi: usize, sx: f32, sy: f32, logical
     }
 }
 
+/// Four small 4-pointed stars orbiting a TEIO piece.
+fn draw_teio_sparkles(cx: f32, cy: f32, halo: f32, elapsed: f32, cam: &Camera) {
+    let gold = Color::new(1.0, 0.92, 0.45, 0.9);
+    let ring = halo + cam.scaled(8.0);
+    for i in 0..4 {
+        let phase = elapsed * 1.6 + i as f32 * std::f32::consts::FRAC_PI_2;
+        let sx = cx + phase.cos() * ring;
+        let sy = cy + phase.sin() * ring;
+        let arm = cam.scaled(4.0);
+        draw_line(sx - arm, sy, sx + arm, sy, 1.5, gold);
+        draw_line(sx, sy - arm, sx, sy + arm, 1.5, gold);
+    }
+}
+
 fn draw_all_pieces(game: &YutGame, assets: &AssetHandles, elapsed: f32, cam: &Camera) {
     for (pi, player) in game.players.iter().enumerate() {
         for (qi, piece) in player.pieces.iter().enumerate() {
@@ -266,14 +299,14 @@ fn draw_all_pieces(game: &YutGame, assets: &AssetHandles, elapsed: f32, cam: &Ca
             if piece.is_home() {
                 let (hx, hy) = home_piece_center(pi, qi);
                 let (sx, sy) = cam.to_screen(hx, hy);
-                draw_piece_sprite(assets, pi, sx, sy, 34.0, cam, 1, 0);
+                draw_piece_sprite(assets, pi, sx, sy, 34.0, cam, 1, 0, game.teio_unlocked, elapsed);
             } else {
                 let (lx, ly) = cell_pos(piece.pos);
                 let offset = qi as f32 * 5.0 - 7.5;
                 let bob = (elapsed * 2.5 + pi as f32 + qi as f32).sin() * 2.0;
                 let (sx, sy) = cam.to_screen(lx + offset, ly + bob);
                 let size = if piece.stack > 1 { 32.0 } else { 26.0 };
-                draw_piece_sprite(assets, pi, sx, sy, size, cam, piece.stack, piece.shield);
+                draw_piece_sprite(assets, pi, sx, sy, size, cam, piece.stack, piece.shield, game.teio_unlocked, elapsed);
             }
         }
     }
@@ -294,12 +327,13 @@ fn draw_home_zones(game: &YutGame, assets: &AssetHandles, elapsed: f32, cam: &Ca
         };
         draw_rectangle(sx, sy, w, h, panel);
         draw_rectangle_lines(sx, sy, w, h, 2.0, PANEL_EDGE);
-        // Player label
-        let name = player_name(pi);
+        // Player label — switches to TEIO once the egg is unlocked for slot 0.
+        let name = effective_player_name(pi, game.teio_unlocked);
         let ns = 14.0 * cam.scale;
         let nd = measure_text(name, None, ns as u16, 1.0);
+        let label_col = effective_player_color(pi, game.teio_unlocked);
         draw_text(name, sx + (w - nd.width) * 0.5, sy + cam.scaled(18.0), ns,
-            Color::new(player_color(pi).r * 0.75, player_color(pi).g * 0.55, player_color(pi).b * 0.45, 1.0));
+            Color::new(label_col.r * 0.75, label_col.g * 0.55, label_col.b * 0.45, 1.0));
         // Count summary
         let player = &game.players.get(pi);
         if let Some(p) = player {
@@ -318,7 +352,8 @@ fn draw_home_zones(game: &YutGame, assets: &AssetHandles, elapsed: f32, cam: &Ca
 
 fn draw_hud(game: &YutGame, _assets: &AssetHandles, cam: &Camera) {
     // Top banner pill with turn / player
-    let turn_txt = format!("Turn {} — {}'s turn", game.turn_count + 1, game.current_player_name());
+    let current = effective_player_name(game.current_player, game.teio_unlocked);
+    let turn_txt = format!("Turn {} — {}'s turn", game.turn_count + 1, current);
     let size = 22.0 * cam.scale;
     let dim = measure_text(&turn_txt, None, size as u16, 1.0);
     let (tx, ty) = cam.to_screen(640.0, 28.0);
@@ -329,7 +364,7 @@ fn draw_hud(game: &YutGame, _assets: &AssetHandles, cam: &Camera) {
         CREAM_PANEL);
     draw_rectangle_lines(tx - dim.width * 0.5 - px, ty - dim.height - py,
         dim.width + px * 2.0, dim.height + py * 2.0, 1.5, PANEL_EDGE);
-    let c = player_color(game.current_player);
+    let c = effective_player_color(game.current_player, game.teio_unlocked);
     let dark = Color::new(c.r * 0.7, c.g * 0.55, c.b * 0.45, 1.0);
     draw_text(&turn_txt, tx - dim.width * 0.5, ty, size, dark);
 
@@ -454,7 +489,14 @@ fn draw_path_choice(_game: &YutGame, cam: &Camera) {
     }
 }
 
-fn draw_menu(assets: &AssetHandles, elapsed: f32, cam: &Camera) {
+fn draw_menu(game: &YutGame, assets: &AssetHandles, elapsed: f32, cam: &Camera) {
+    // AeiROBOT brand line above the title.
+    let brand = "AeiROBOT × EDIE";
+    let bs = 18.0 * cam.scale;
+    let bd = measure_text(brand, None, bs as u16, 1.0);
+    let (bx, by) = cam.to_screen(640.0, 150.0);
+    draw_text(brand, bx - bd.width * 0.5, by, bs, Color::new(0.45, 0.28, 0.08, 0.85));
+
     let title = "EDIE YUT NORI";
     let sub = "초능력 윷놀이";
     let size = 54.0 * cam.scale;
@@ -467,25 +509,43 @@ fn draw_menu(assets: &AssetHandles, elapsed: f32, cam: &Camera) {
     let (sxp, syp) = cam.to_screen(640.0, 246.0);
     draw_text(sub, sxp - sd.width * 0.5, syp, ss, Color::new(0.25, 0.62, 0.46, 1.0));
 
+    if game.teio_unlocked {
+        let teio = "★ TEIO MODE ★";
+        let ts = 16.0 * cam.scale;
+        let td = measure_text(teio, None, ts as u16, 1.0);
+        let (tx2, ty2) = cam.to_screen(640.0, 272.0);
+        draw_text(teio, tx2 - td.width * 0.5, ty2, ts, teio_gold());
+    }
+
     // Character cameo row
     let cameos = [&assets.edie_static_run, &assets.obstacle_alice3, &assets.obstacle_amy, &assets.obstacle_boxbot];
-    let colors = [player_color(0), player_color(1), player_color(2), player_color(3)];
+    let colors = [
+        effective_player_color(0, game.teio_unlocked),
+        player_color(1),
+        player_color(2),
+        player_color(3),
+    ];
     let start = 640.0 - (cameos.len() as f32 - 1.0) * 0.5 * 96.0;
     for (i, tex) in cameos.iter().enumerate() {
         let lx = start + i as f32 * 96.0;
         let ly = 300.0 + ((elapsed * 2.5 + i as f32 * 0.7).sin() * 4.0);
         let (sx, sy) = cam.to_screen(lx, ly);
-        draw_circle(sx, sy, cam.scaled(30.0), Color::new(colors[i].r, colors[i].g, colors[i].b, 0.85));
-        draw_circle_lines(sx, sy, cam.scaled(30.0), 2.0, PANEL_EDGE);
+        let halo = cam.scaled(30.0);
+        draw_circle(sx, sy, halo, Color::new(colors[i].r, colors[i].g, colors[i].b, 0.85));
+        draw_circle_lines(sx, sy, halo, 2.0, PANEL_EDGE);
         let src_w = tex.width();
         let src_h = tex.height();
         let fit = (44.0 / src_w).min(44.0 / src_h);
         let pw = src_w * fit;
         let ph = src_h * fit;
-        draw_texture_ex(tex, sx - cam.scaled(pw) * 0.5, sy - cam.scaled(ph) * 0.5, WHITE, DrawTextureParams {
+        let tint = if i == 0 && game.teio_unlocked { Color::new(1.0, 0.88, 0.55, 1.0) } else { WHITE };
+        draw_texture_ex(tex, sx - cam.scaled(pw) * 0.5, sy - cam.scaled(ph) * 0.5, tint, DrawTextureParams {
             dest_size: Some(vec2(cam.scaled(pw), cam.scaled(ph))),
             ..Default::default()
         });
+        if i == 0 && game.teio_unlocked {
+            draw_teio_sparkles(sx, sy, halo, elapsed, cam);
+        }
     }
 
     let opts = [("1. 2P GAME", 400.0), ("2. 3P GAME", 450.0), ("3. 4P GAME", 500.0)];
@@ -513,9 +573,9 @@ fn draw_game_over(game: &YutGame, assets: &AssetHandles, elapsed: f32, cam: &Cam
     draw_rectangle(x0, y0, cam.scaled(YUT_W), cam.scaled(YUT_H),
         Color::new(1.0, 0.97, 0.90, 0.78));
     let winner_idx = game.winner.unwrap_or(0);
-    let winner_name = player_name(winner_idx);
+    let winner_name = effective_player_name(winner_idx, game.teio_unlocked);
     let title = format!("{} WINS!", winner_name);
-    let c = game.winner.map(player_color).unwrap_or(ORANGE);
+    let c = game.winner.map(|w| effective_player_color(w, game.teio_unlocked)).unwrap_or(ORANGE);
     let color = Color::new(c.r * 0.75, c.g * 0.55, c.b * 0.4, 1.0);
     let size = 58.0 * cam.scale;
     let dim = measure_text(&title, None, size as u16, 1.0);
@@ -565,7 +625,7 @@ fn draw_power_cards(game: &YutGame, cam: &Camera) {
     draw_rectangle(px, py, cam.scaled(panel_w), cam.scaled(panel_h), CREAM_PANEL);
     draw_rectangle_lines(px, py, cam.scaled(panel_w), cam.scaled(panel_h), 1.5, PANEL_EDGE);
     let ts = 13.0 * cam.scale;
-    let header = format!("{} 초능력", game.current_player_name());
+    let header = format!("{} 초능력", effective_player_name(pi, game.teio_unlocked));
     let (hx, hy) = cam.to_screen(panel_x + 12.0, panel_y + 20.0);
     draw_text(&header, hx, hy, ts, WARM_TEXT);
     for (i, card) in cards.iter().enumerate() {

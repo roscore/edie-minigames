@@ -47,14 +47,19 @@ async fn main() {
                 if is_key_pressed(KeyCode::Key1) { game.start_game(2); }
                 else if is_key_pressed(KeyCode::Key2) { game.start_game(3); }
                 else if is_key_pressed(KeyCode::Key3) { game.start_game(4); }
-                // Mouse/touch menu
+                // Hidden easter-egg input: typing T-E-I-O unlocks TEIO mode.
+                for (ch, kc) in [('T', KeyCode::T), ('E', KeyCode::E), ('I', KeyCode::I), ('O', KeyCode::O)] {
+                    if is_key_pressed(kc) { game.feed_menu_key(ch); }
+                }
+                // Mouse/touch menu — pills are centered at y = 400 / 450 / 500,
+                // ~40px tall, so accept y in each option's ±24 band.
                 let menu_click = |my: f32| -> Option<usize> {
                     let cam = edie_runner::render::camera::Camera::with_logical(
                         1280.0, 720.0, screen_width(), screen_height());
                     let ly = (my - cam.offset_y) / cam.scale;
-                    if ly > 330.0 && ly < 375.0 { Some(2) }
-                    else if ly > 380.0 && ly < 425.0 { Some(3) }
-                    else if ly > 430.0 && ly < 475.0 { Some(4) }
+                    if ly > 376.0 && ly < 424.0 { Some(2) }
+                    else if ly > 426.0 && ly < 474.0 { Some(3) }
+                    else if ly > 476.0 && ly < 524.0 { Some(4) }
                     else { None }
                 };
                 if is_mouse_button_pressed(MouseButton::Left) {

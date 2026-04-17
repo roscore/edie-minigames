@@ -87,6 +87,10 @@ pub struct YutGame {
     pub aurora_bonus: usize,
     pub blocked_cells: Vec<(usize, u8)>,  // (position, turns_remaining)
     pub traps: Vec<(usize, usize)>,       // (position, owner_player)
+    // TEIO easter egg — stays on once unlocked.
+    pub teio_unlocked: bool,
+    teio_buffer: String,
+    mo_streak: u32,
 }
 
 impl YutGame {
@@ -109,7 +113,30 @@ impl YutGame {
             aurora_bonus: 0,
             blocked_cells: Vec::new(),
             traps: Vec::new(),
+            teio_unlocked: false,
+            teio_buffer: String::new(),
+            mo_streak: 0,
         }
+    }
+
+    /// Feed a character from the menu's keyboard input. Unlocks TEIO
+    /// if the last four characters spell "TEIO" (case-insensitive).
+    pub fn feed_menu_key(&mut self, c: char) {
+        let c = c.to_ascii_uppercase();
+        if !c.is_ascii_alphabetic() { return; }
+        self.teio_buffer.push(c);
+        if self.teio_buffer.len() > 8 {
+            let drop = self.teio_buffer.len() - 8;
+            self.teio_buffer.drain(..drop);
+        }
+        if self.teio_buffer.ends_with("TEIO") && !self.teio_unlocked {
+            self.unlock_teio("비밀 코드 입력!");
+        }
+    }
+
+    fn unlock_teio(&mut self, reason: &str) {
+        self.teio_unlocked = true;
+        self.toast = Some((format!("★ TEIO MODE — {} ★", reason), 3.5));
     }
 
     pub fn start_game(&mut self, num_players: usize) {
@@ -129,6 +156,10 @@ impl YutGame {
         self.aurora_bonus = 0;
         self.blocked_cells = Vec::new();
         self.traps = Vec::new();
+        // teio_unlocked / teio_buffer / mo_streak persist across matches
+        // so the egg, once found, stays. Reset the Mo streak for a clean
+        // per-match counter.
+        self.mo_streak = 0;
     }
 
     /// Use a power card from the current player's hand.
@@ -283,6 +314,15 @@ impl YutGame {
         self.last_sticks = Some(sticks);
         if result.grants_bonus() {
             self.bonus_turns += 1;
+        }
+        // TEIO easter egg via three consecutive Mo's — ~0.024% per 3 throws.
+        if result == YutResult::Mo {
+            self.mo_streak += 1;
+            if self.mo_streak >= 3 && !self.teio_unlocked {
+                self.unlock_teio("3연속 모!");
+            }
+        } else {
+            self.mo_streak = 0;
         }
         // Grant power card every N turns
         let pi = self.current_player;
@@ -610,6 +650,56 @@ mod tests {
         let movable = g.players[0].movable_pieces();
         assert!(!movable.contains(&1), "rider piece should not be movable");
         assert!(movable.contains(&0), "primary piece should remain movable");
+    }
+
+    #[test]
+    fn teio_unlock_via_keyboard_sequence() {
+        let mut g = new_game(2);
+        assert!(!g.teio_unlocked);
+        for c in "TEIO".chars() { g.feed_menu_key(c); }
+        assert!(g.teio_unlocked);
+    }
+
+    #[test]
+    fn teio_unlock_ignores_non_alpha() {
+        let mut g = new_game(2);
+        for c in "T_E_I_O".chars() { g.feed_menu_key(c); }
+        assert!(g.teio_unlocked);
+    }
+
+    #[test]
+    fn teio_unlock_case_insensitive() {
+        let mut g = new_game(2);
+        for c in "teio".chars() { g.feed_menu_key(c); }
+        assert!(g.teio_unlocked);
+    }
+
+    #[test]
+    fn teio_unlock_via_mo_streak() {
+        let mut g = new_game(2);
+        // Manufacture a 3-Mo streak by spoofing the throw result through
+        // the public path: do_throw + force result after-the-fact isn't
+        // reachable, so simulate the streak logic directly.
+        g.phase = Phase::Throwing;
+        // Set up so that do_throw always produces Mo: 0 flats needed.
+        // Since throw_yut uses rng, we instead exercise the streak path
+        // by calling do_throw until we see 3 Mos. Cap retries to avoid
+        // flakiness in CI.
+        let mut mos = 0;
+        for _ in 0..5000 {
+            if g.phase != Phase::Throwing { g.advance_turn(); }
+            g.do_throw();
+            if matches!(g.last_throw, Some(YutResult::Mo)) {
+                mos += 1;
+            } else {
+                mos = 0;
+            }
+            if g.teio_unlocked { break; }
+            // Reset phase so next iter throws again.
+            g.phase = Phase::Throwing;
+            if mos >= 3 { break; }
+        }
+        assert!(g.teio_unlocked || mos < 3, "streak-based unlock path exercised");
     }
 
     #[test]
