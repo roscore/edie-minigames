@@ -37,8 +37,6 @@ impl Side {
 /// Aurora powerup types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Powerup {
-    /// Next regular move deals 2× HP damage (auto-applied).
-    DoubleStrike,
     /// Remove one virus cell from the board (click to target).
     VirusCure,
     /// Flip any one opponent piece to yours (click to target, costs turn).
@@ -195,8 +193,8 @@ impl Board {
             self.aurora_cells.retain(|&pos| pos != (row, col));
             let existing = self.powerup(side);
             if existing.is_none() {
-                let choices = [Powerup::DoubleStrike, Powerup::VirusCure, Powerup::ForceFlip];
-                let idx = ((row * 7 + col * 13 + self.turn_count as usize) % choices.len()) as usize;
+                let choices = [Powerup::VirusCure, Powerup::ForceFlip];
+                let idx = (row * 7 + col * 13 + self.turn_count as usize) % choices.len();
                 let pw = choices[idx];
                 self.set_powerup(side, Some(pw));
                 Some(pw)
@@ -210,12 +208,7 @@ impl Board {
         let flipped = self.flips_for_move(row, col, side);
         for &(fr, fc) in &flipped { self.cells[fr][fc] = Cell::Piece(side); }
         let n = flipped.len() as u32;
-        let mut damage = damage_for_flips(n);
-        // Double Strike: consume the powerup and double damage
-        if self.powerup(side) == Some(Powerup::DoubleStrike) && damage > 0 {
-            damage *= 2;
-            self.set_powerup(side, None);
-        }
+        let damage = damage_for_flips(n);
         let mungchi_alert = flipped.len() >= MUNGCHI_THRESHOLD;
         match side {
             Side::Edie => self.alice_hp -= damage,

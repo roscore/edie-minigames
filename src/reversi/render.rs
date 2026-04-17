@@ -13,11 +13,11 @@ const BOARD_PX: f32 = 560.0;
 const CELL_PX: f32 = BOARD_PX / BOARD_SIZE as f32;
 const BOARD_X: f32 = (REVERSE_W - BOARD_PX) / 2.0;
 const BOARD_Y: f32 = 80.0;
-const ORANGE: Color = Color::new(0.91, 0.57, 0.23, 1.0);
-const GREEN: Color = Color::new(0.36, 0.89, 0.66, 1.0);
-const CELL_A: Color = Color::new(0.10, 0.21, 0.20, 1.0);
-const CELL_B: Color = Color::new(0.16, 0.14, 0.13, 1.0);
-const GRID_LINE: Color = Color::new(0.36, 0.89, 0.66, 0.22);
+const ORANGE: Color = Color::new(0.98, 0.66, 0.32, 1.0);
+const GREEN: Color = Color::new(0.46, 0.95, 0.74, 1.0);
+const CELL_A: Color = Color::new(0.82, 0.92, 0.88, 1.0);
+const CELL_B: Color = Color::new(0.94, 0.88, 0.78, 1.0);
+const GRID_LINE: Color = Color::new(0.24, 0.58, 0.45, 0.35);
 
 /// Theme names for the easter egg.
 pub const THEME_NAMES: [&str; 5] = ["EDIE", "AMY", "ALICE M1", "ALICE 3", "ALICE 4"];
@@ -52,7 +52,7 @@ pub const TITLE_RECT: (f32, f32, f32, f32) = (300.0, 120.0, 680.0, 100.0);
 
 pub fn draw_reversi(game: &ReversiGame, assets: &AssetHandles, elapsed: f32) {
     let cam = Camera::with_logical(REVERSE_W, REVERSE_H, screen_width(), screen_height());
-    clear_background(Color::new(0.06, 0.06, 0.10, 1.0));
+    clear_background(Color::new(0.96, 0.94, 0.88, 1.0));
     draw_background(elapsed, &cam);
     match game.phase {
         Phase::Menu => draw_menu(game.theme_index, &cam),
@@ -97,20 +97,20 @@ fn draw_board_frame(cam: &Camera) {
     let (fx, fy) = cam.to_screen(BOARD_X - pad, BOARD_Y - pad);
     let fw = cam.scaled(BOARD_PX + pad * 2.0);
     let fh = cam.scaled(BOARD_PX + pad * 2.0);
-    draw_rectangle(fx, fy, fw, fh, Color::new(0.08, 0.08, 0.12, 1.0));
+    draw_rectangle(fx, fy, fw, fh, Color::new(0.98, 0.93, 0.84, 1.0));
     let strip_h = cam.scaled(4.0);
     for i in 0..40 {
         let t = i as f32 / 39.0;
         let c = Color::new(
             ORANGE.r + (GREEN.r - ORANGE.r) * t,
             ORANGE.g + (GREEN.g - ORANGE.g) * t,
-            ORANGE.b + (GREEN.b - ORANGE.b) * t, 0.85);
+            ORANGE.b + (GREEN.b - ORANGE.b) * t, 0.95);
         let sx = fx + (i as f32 / 40.0) * fw;
         let sw = fw / 40.0 + 1.0;
         draw_rectangle(sx, fy, sw, strip_h, c);
         draw_rectangle(sx, fy + fh - strip_h, sw, strip_h, c);
     }
-    draw_rectangle_lines(fx, fy, fw, fh, 3.0, Color::new(0.5, 0.5, 0.55, 0.9));
+    draw_rectangle_lines(fx, fy, fw, fh, 3.0, Color::new(0.78, 0.62, 0.40, 0.9));
 }
 
 fn draw_cells(cam: &Camera) {
@@ -237,10 +237,12 @@ fn draw_flip_overlay(anim: &FlipAnim, cam: &Camera) {
 fn draw_hud(board: &Board, assets: &AssetHandles, elapsed: f32, theme_idx: usize, mode: GameMode, cam: &Camera) {
     // Left panel background
     let (lpx, lpy) = cam.to_screen(10.0, 648.0);
-    draw_rectangle(lpx, lpy, cam.scaled(250.0), cam.scaled(68.0), Color::new(0.0, 0.0, 0.0, 0.6));
+    draw_rectangle(lpx, lpy, cam.scaled(250.0), cam.scaled(68.0), Color::new(1.0, 0.95, 0.86, 0.78));
+    draw_rectangle_lines(lpx, lpy, cam.scaled(250.0), cam.scaled(68.0), 1.5, Color::new(0.78, 0.62, 0.40, 0.6));
     // Right panel background
     let (rpx, rpy) = cam.to_screen(1020.0, 648.0);
-    draw_rectangle(rpx, rpy, cam.scaled(250.0), cam.scaled(68.0), Color::new(0.0, 0.0, 0.0, 0.6));
+    draw_rectangle(rpx, rpy, cam.scaled(250.0), cam.scaled(68.0), Color::new(1.0, 0.95, 0.86, 0.78));
+    draw_rectangle_lines(rpx, rpy, cam.scaled(250.0), cam.scaled(68.0), 1.5, Color::new(0.78, 0.62, 0.40, 0.6));
 
     // Player character (left side, large)
     let player_tex = theme_texture(theme_idx, assets);
@@ -274,19 +276,19 @@ fn draw_hud(board: &Board, assets: &AssetHandles, elapsed: f32, theme_idx: usize
     let ec = format!("{} pcs", board.piece_count(Side::Edie));
     let ac = format!("{} pcs", board.piece_count(Side::Alice));
     let (epx, epy) = cam.to_screen(78.0, 695.0);
-    draw_text(&ec, epx, epy, size, Color::new(1.0, 1.0, 1.0, 0.9));
+    draw_text(&ec, epx, epy, size, Color::new(0.25, 0.18, 0.12, 0.95));
     let (apx, apy) = cam.to_screen(1090.0, 695.0);
-    draw_text(&ac, apx, apy, size, Color::new(1.0, 1.0, 1.0, 0.9));
+    draw_text(&ac, apx, apy, size, Color::new(0.25, 0.18, 0.12, 0.95));
 }
 
 fn draw_hp_bar(lx: f32, ly: f32, hp: i32, label: &str, gradient: bool, cam: &Camera) {
     let bw = 170.0;
     let bh = 18.0;
     let (sx, sy) = cam.to_screen(lx, ly);
-    // Label with shadow for readability
+    // Label — dark warm text on cream panel
     let label_size = 18.0 * cam.scale;
-    draw_text(label, sx + 1.0, sy - cam.scaled(3.0) + 1.0, label_size, Color::new(0.0, 0.0, 0.0, 0.5));
-    draw_text(label, sx, sy - cam.scaled(3.0), label_size, WHITE);
+    draw_text(label, sx + 1.0, sy - cam.scaled(3.0) + 1.0, label_size, Color::new(1.0, 1.0, 1.0, 0.55));
+    draw_text(label, sx, sy - cam.scaled(3.0), label_size, Color::new(0.22, 0.15, 0.10, 1.0));
     // Bar background
     draw_rectangle(sx, sy, cam.scaled(bw), cam.scaled(bh), Color::new(0.15, 0.15, 0.18, 1.0));
     let ratio = (hp as f32 / INITIAL_HP as f32).clamp(0.0, 1.0);
@@ -322,12 +324,12 @@ fn draw_turn_indicator(board: &Board, elapsed: f32, cam: &Camera) {
     let size = 26.0 * cam.scale;
     let dim = measure_text(label, None, size as u16, 1.0);
     let (tx, ty) = cam.to_screen(640.0, BOARD_Y + BOARD_PX + 30.0 + bounce);
-    let col = match board.turn { Side::Edie => ORANGE, Side::Alice => Color::new(0.9, 0.3, 0.35, 1.0) };
+    let col = match board.turn { Side::Edie => ORANGE, Side::Alice => Color::new(0.88, 0.32, 0.38, 1.0) };
     // Background pill for readability
     draw_rectangle(tx - dim.width * 0.5 - cam.scaled(10.0), ty - dim.height - cam.scaled(4.0),
         dim.width + cam.scaled(20.0), dim.height + cam.scaled(8.0),
-        Color::new(0.0, 0.0, 0.0, 0.5));
-    draw_text(label, tx - dim.width * 0.5 + 1.0, ty + 1.0, size, Color::new(0.0, 0.0, 0.0, 0.5));
+        Color::new(1.0, 0.95, 0.86, 0.78));
+    draw_text(label, tx - dim.width * 0.5 + 1.0, ty + 1.0, size, Color::new(1.0, 1.0, 1.0, 0.55));
     draw_text(label, tx - dim.width * 0.5, ty, size, col);
 }
 
@@ -363,13 +365,13 @@ fn draw_menu(theme_idx: usize, cam: &Camera) {
     let hs = 16.0 * cam.scale;
     let hd = measure_text(hint, None, hs as u16, 1.0);
     let (hx, hy) = cam.to_screen(640.0, 560.0);
-    draw_text(hint, hx - hd.width * 0.5, hy, hs, Color::new(0.6, 0.6, 0.6, 1.0));
+    draw_text(hint, hx - hd.width * 0.5, hy, hs, Color::new(0.30, 0.22, 0.15, 0.9));
 }
 
 fn draw_game_over(game: &ReversiGame, assets: &AssetHandles, elapsed: f32, cam: &Camera) {
     let board = &game.board;
     let (x0, y0) = cam.to_screen(0.0, 0.0);
-    draw_rectangle(x0, y0, cam.scaled(REVERSE_W), cam.scaled(REVERSE_H), Color::new(0.0, 0.0, 0.0, 0.7));
+    draw_rectangle(x0, y0, cam.scaled(REVERSE_W), cam.scaled(REVERSE_H), Color::new(1.0, 0.97, 0.90, 0.78));
 
     let is_edie_win = board.winner() == Some(Side::Edie);
     let is_alice_win = board.winner() == Some(Side::Alice);
@@ -392,14 +394,14 @@ fn draw_game_over(game: &ReversiGame, assets: &AssetHandles, elapsed: f32, cam: 
         None => "DRAW!".to_string(),
     };
     let color = match board.winner() {
-        Some(Side::Edie) => Color::new(1.0, 0.85, 0.2, 1.0),
-        Some(Side::Alice) => Color::new(0.5, 0.5, 0.6, 1.0),
-        None => Color::new(0.8, 0.8, 0.8, 1.0),
+        Some(Side::Edie) => Color::new(0.95, 0.62, 0.15, 1.0),
+        Some(Side::Alice) => Color::new(0.75, 0.30, 0.35, 1.0),
+        None => Color::new(0.40, 0.30, 0.20, 1.0),
     };
     let size = 60.0 * cam.scale;
     let dim = measure_text(&win_label, None, size as u16, 1.0);
     let (tx, ty) = cam.to_screen(640.0, 200.0);
-    draw_text(&win_label, tx - dim.width * 0.5 + 4.0, ty + 4.0, size, Color::new(0.0, 0.0, 0.0, 0.8));
+    draw_text(&win_label, tx - dim.width * 0.5 + 4.0, ty + 4.0, size, Color::new(1.0, 0.95, 0.85, 0.7));
     draw_text(&win_label, tx - dim.width * 0.5, ty, size, color);
 
     // Winner subtitle
@@ -411,7 +413,7 @@ fn draw_game_over(game: &ReversiGame, assets: &AssetHandles, elapsed: f32, cam: 
     let sub_size = 24.0 * cam.scale;
     let sub_dim = measure_text(&sub_label, None, sub_size as u16, 1.0);
     let (stx, sty) = cam.to_screen(640.0, 240.0);
-    draw_text(&sub_label, stx - sub_dim.width * 0.5, sty, sub_size, Color::new(0.9, 0.9, 0.9, 0.9));
+    draw_text(&sub_label, stx - sub_dim.width * 0.5, sty, sub_size, Color::new(0.30, 0.22, 0.15, 0.95));
 
     // Winner character (large, celebratory) and loser (small, sad)
     let winner_tex = match board.winner() {
@@ -455,15 +457,15 @@ fn draw_game_over(game: &ReversiGame, assets: &AssetHandles, elapsed: f32, cam: 
     // Score bg panel
     draw_rectangle(sxp - sd.width * 0.5 - cam.scaled(12.0), syp - sd.height - cam.scaled(6.0),
         sd.width + cam.scaled(24.0), sd.height + cam.scaled(12.0),
-        Color::new(0.0, 0.0, 0.0, 0.5));
-    draw_text(&score_txt, sxp - sd.width * 0.5, syp, ss, Color::new(1.0, 1.0, 1.0, 0.95));
+        Color::new(1.0, 0.93, 0.82, 0.85));
+    draw_text(&score_txt, sxp - sd.width * 0.5, syp, ss, Color::new(0.25, 0.18, 0.12, 0.98));
 
     // Restart hint
     let sub = "TAP or SPACE to play again";
     let hs = 20.0 * cam.scale;
     let hd = measure_text(sub, None, hs as u16, 1.0);
     let (hx, hy) = cam.to_screen(640.0, 540.0);
-    draw_text(sub, hx - hd.width * 0.5, hy, hs, Color::new(0.8, 0.8, 0.8, 0.9));
+    draw_text(sub, hx - hd.width * 0.5, hy, hs, Color::new(0.35, 0.24, 0.16, 0.95));
 }
 
 fn draw_aurora_cells(board: &Board, elapsed: f32, cam: &Camera) {
@@ -553,7 +555,6 @@ fn draw_powerup_icon(lx: f32, ly: f32, pw: Option<Powerup>, _label: &str, is_edi
         draw_rectangle(sx, sy, bw, bh, bg);
         draw_rectangle_lines(sx, sy, bw, bh, 1.5, Color::new(1.0, 1.0, 1.0, 0.5));
         let name = match powerup {
-            Powerup::DoubleStrike => "2x STRIKE",
             Powerup::VirusCure => "VIRUS CURE [Q]",
             Powerup::ForceFlip => "FORCE FLIP [Q]",
         };
@@ -605,42 +606,42 @@ fn draw_toast(msg: &str, remaining: f32, cam: &Camera) {
     draw_rectangle(
         tx - dim.width * 0.5 - px, ty - dim.height - py,
         dim.width + px * 2.0, dim.height + py * 2.0,
-        Color::new(0.0, 0.0, 0.0, 0.7 * alpha),
+        Color::new(1.0, 0.96, 0.86, 0.85 * alpha),
     );
-    draw_text(msg, tx - dim.width * 0.5, ty, size, Color::new(1.0, 0.95, 0.6, alpha));
+    draw_text(msg, tx - dim.width * 0.5, ty, size, Color::new(0.75, 0.40, 0.10, alpha));
 }
 
 fn draw_background(elapsed: f32, cam: &Camera) {
     let (x0, y0) = cam.to_screen(0.0, 0.0);
     let w = cam.scaled(REVERSE_W);
     let h = cam.scaled(REVERSE_H);
-    // Subtle animated gradient background
+    // Bright, airy gradient — peach sky fading into mint
     let t = (elapsed * 0.3).sin() * 0.5 + 0.5;
-    let bg_top = Color::new(0.04 + 0.02 * t, 0.04, 0.08 + 0.03 * t, 1.0);
-    let bg_bot = Color::new(0.06, 0.06 + 0.02 * t, 0.04 + 0.02 * t, 1.0);
+    let bg_top = Color::new(1.00, 0.90 + 0.03 * t, 0.80, 1.0);
+    let bg_bot = Color::new(0.86, 0.96, 0.90 + 0.02 * t, 1.0);
     // Top half
     draw_rectangle(x0, y0, w, h * 0.5, bg_top);
     // Bottom half
     draw_rectangle(x0, y0 + h * 0.5, w, h * 0.5, bg_bot);
     // Subtle grid pattern
-    let grid_alpha = 0.03;
+    let grid_alpha = 0.08;
     let grid_sp = cam.scaled(40.0);
     let cols = (w / grid_sp) as usize + 1;
     let rows = (h / grid_sp) as usize + 1;
     for i in 0..cols {
         let gx = x0 + i as f32 * grid_sp;
-        draw_line(gx, y0, gx, y0 + h, 1.0, Color::new(0.5, 0.9, 0.7, grid_alpha));
+        draw_line(gx, y0, gx, y0 + h, 1.0, Color::new(0.4, 0.75, 0.6, grid_alpha));
     }
     for j in 0..rows {
         let gy = y0 + j as f32 * grid_sp;
-        draw_line(x0, gy, x0 + w, gy, 1.0, Color::new(0.5, 0.9, 0.7, grid_alpha));
+        draw_line(x0, gy, x0 + w, gy, 1.0, Color::new(0.4, 0.75, 0.6, grid_alpha));
     }
-    // Corner decorations (subtle AeiROBOT gradient dots)
+    // Corner decorations (AeiROBOT gradient dots)
     for corner in &[(60.0, 60.0), (REVERSE_W - 60.0, 60.0), (60.0, REVERSE_H - 60.0), (REVERSE_W - 60.0, REVERSE_H - 60.0)] {
         let (sx, sy) = cam.to_screen(corner.0, corner.1);
-        let pulse = 0.15 + 0.1 * (elapsed * 1.5 + corner.0 * 0.01).sin();
-        draw_circle(sx, sy, cam.scaled(20.0), Color::new(0.91, 0.57, 0.23, pulse * 0.3));
-        draw_circle(sx, sy, cam.scaled(12.0), Color::new(0.36, 0.89, 0.66, pulse * 0.2));
+        let pulse = 0.25 + 0.15 * (elapsed * 1.5 + corner.0 * 0.01).sin();
+        draw_circle(sx, sy, cam.scaled(20.0), Color::new(0.98, 0.66, 0.32, pulse * 0.45));
+        draw_circle(sx, sy, cam.scaled(12.0), Color::new(0.46, 0.95, 0.74, pulse * 0.35));
     }
 }
 

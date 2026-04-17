@@ -110,7 +110,6 @@ impl ReversiGame {
         let result = self.board.apply_move(row, col);
         if let Some(pw) = result.powerup_gained {
             let name = match pw {
-                Powerup::DoubleStrike => "DOUBLE STRIKE",
                 Powerup::VirusCure => "VIRUS CURE",
                 Powerup::ForceFlip => "FORCE FLIP",
             };
@@ -132,12 +131,9 @@ impl ReversiGame {
     pub fn activate_powerup(&mut self) {
         if self.phase != Phase::Playing { return; }
         let side = self.board.turn;
-        match self.board.powerup(side) {
-            Some(Powerup::VirusCure) | Some(Powerup::ForceFlip) => {
-                self.targeting_powerup = self.board.powerup(side);
-                self.phase = Phase::UsingPowerup;
-            }
-            _ => {} // DoubleStrike is auto-applied, nothing to activate
+        if let Some(Powerup::VirusCure) | Some(Powerup::ForceFlip) = self.board.powerup(side) {
+            self.targeting_powerup = self.board.powerup(side);
+            self.phase = Phase::UsingPowerup;
         }
     }
 
