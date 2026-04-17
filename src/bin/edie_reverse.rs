@@ -66,7 +66,8 @@ async fn main() {
                 if is_mouse_button_pressed(MouseButton::Left) {
                     let (mx, my) = mouse_position();
                     if title_hit(mx, my) {
-                        game.theme_index = (game.theme_index + 1) % edie_runner::reversi::render::THEME_COUNT;
+                        let n = game.theme_cycle_count();
+                        game.theme_index = (game.theme_index + 1) % n;
                     } else if let Some(mode) = menu_click(my) {
                         game.start_game(mode);
                     }
@@ -74,11 +75,16 @@ async fn main() {
                 for t in touches() {
                     if let macroquad::input::TouchPhase::Started = t.phase {
                         if title_hit(t.position.x, t.position.y) {
-                            game.theme_index = (game.theme_index + 1) % edie_runner::reversi::render::THEME_COUNT;
+                            let n = game.theme_cycle_count();
+                            game.theme_index = (game.theme_index + 1) % n;
                         } else if let Some(mode) = menu_click(t.position.y) {
                             game.start_game(mode);
                         }
                     }
+                }
+                // Hidden easter-egg input: typing T-E-I-O unlocks the TEIO theme.
+                for (ch, kc) in [('T', KeyCode::T), ('E', KeyCode::E), ('I', KeyCode::I), ('O', KeyCode::O)] {
+                    if is_key_pressed(kc) { game.feed_menu_key(ch); }
                 }
             }
             Phase::Playing => {
